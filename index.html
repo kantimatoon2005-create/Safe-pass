@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAFE PASS: Smart Work Permit System</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{box-sizing:border-box;font-family:Arial,Tahoma,sans-serif}
+body{margin:0;background:#f0f4f8;color:#1e293b}
+
+/* ===== LOGIN OVERLAY (ล็อคหน้าเว็บทั้งหมดไว้ก่อน) ===== */
+#app-login-screen{
+  position:fixed;
+  top:0;left:0;width:100vw;height:100vh;
+  background:#0f172a;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  z-index:9999;
+  padding:20px;
+}
+.login-card{
+  background:white;
+  width:100%;
+  max-width:420px;
+  padding:35px 30px;
+  border-radius:16px;
+  box-shadow:0 20px 25px -5px rgba(0,0,0,0.3);
+  text-align:center;
+}
+.login-card h2{color:#0284c7;margin-top:0;font-size:26px;margin-bottom:6px}
+.login-card p.sub{color:#64748b;font-size:13px;margin-bottom:25px}
+
+/* ===== MAIN SYSTEM LAYOUT ===== */
+.sidebar{background:#0f172a;color:white;padding:15px}
+.sidebar h2{color:#38bdf8;text-align:center;font-size:20px;margin-bottom:5px}
+.sidebar p.sub-title{text-align:center;color:#94a3b8;font-size:12px;margin-top:0;margin-bottom:20px}
+.sidebar-menu{display:flex;gap:8px;flex-wrap:wrap}
+.menu-item{border:0;padding:12px;border-radius:8px;background:transparent;color:white;cursor:pointer;width:100%;text-align:left}
+.menu-item.active{background:#0284c7}
+.main-content{padding:15px;flex:1;min-width:0}
+.card-container{max-width:950px;margin:0 auto 20px;background:white;padding:22px;border-radius:12px;border:1px solid #e2e8f0}
+.page-title{text-align:center;font-size:24px;margin-bottom:25px;color:#0f172a}
+.section-title{color:#0369a1;font-size:18px;font-weight:bold;border-left:5px solid #0284c7;padding-left:12px;margin:28px 0 18px}
+.form-grid{display:grid;grid-template-columns:1fr;gap:18px}
+.form-group{min-width:0;text-align:left}
+label{display:block;font-weight:bold;margin-bottom:8px;line-height:1.5}
+.req{color:red}
+input[type=text],input[type=email],input[type=number],input[type=date],input[type=file],input[type=password],textarea,select{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;background:white}
+input[readonly]{background:#f1f5f9;color:#0284c7;font-weight:bold}
+.options-group{display:flex;flex-direction:column;gap:10px}
+.option-label{display:flex;align-items:center;gap:10px;font-weight:normal;cursor:pointer}
+.hidden{display:none!important}
+.notice,.warning{padding:12px 16px;border-radius:8px;margin-bottom:18px;line-height:1.6;font-size:14px}
+.notice{background:#eff6ff;color:#1d4ed8;border:1px solid #bfdbfe}
+.warning{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.btn{padding:12px 16px;border:0;border-radius:7px;font-size:15px;font-weight:bold;cursor:pointer}
+.btn-primary{background:#0284c7;color:white}
+.btn-success{background:#15803d;color:white}
+.btn-danger{background:#dc2626;color:white}
+.btn-submit{width:100%;margin-top:24px}
+.record{border:1px solid #cbd5e1;border-radius:9px;padding:18px;margin-top:15px;background:#fff}
+.checklist-box{background:#f8fafc;padding:15px;border-radius:8px;border:1px solid #cbd5e1;margin-top:10px}
+.status{display:inline-block;padding:5px 12px;border-radius:20px;font-size:13px;font-weight:bold}
+.status-Pending{background:#fef3c7;color:#92400e}
+.status-Approved{background:#dcfce7;color:#166534}
+.status-Rejected{background:#fee2e2;color:#991b1b}
+.user-bar{background:#0f172a;color:white;padding:10px 15px;display:flex;justify-content:space-between;align-items:center;border-radius:8px;margin-bottom:15px}
+
+@media(min-width:768px){
+body{display:flex}
+.sidebar{width:260px;min-height:100vh;flex-shrink:0}
+.main-content{flex:1;padding:30px;min-width:0}
+.card-container{padding:30px}
+.form-grid{grid-template-columns:1fr 1fr}
+.full-width{grid-column:1/-1}
+}
+</style>
+</head>
+<body>
+
+<!-- ==================== SCREEN 0: LOGIN OVERLAY (ล็อคหน้าแรก) ==================== -->
+<div id="app-login-screen">
+  <div class="login-card">
+    <h2>SAFE PASS</h2>
+    <p class="sub">Smart Work Permit & Safety Digital Passport</p>
+    
+    <form onsubmit="handleGlobalLogin(event)">
+      <div class="form-group" style="margin-bottom:15px;">
+        <label>อีเมลผู้ใช้งาน (Email) <span class="req">*</span></label>
+        <input type="email" id="app_email" placeholder="กรอกอีเมลของคุณ" required>
+      </div>
+      <div class="form-group" style="margin-bottom:20px;">
+        <label>รหัสผ่าน (Password) <span class="req">*</span></label>
+        <input type="password" id="app_password" placeholder="••••••••" required>
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%; padding:14px; font-size:16px;">เข้าสู่ระบบ</button>
+    </form>
+    
+    <div style="margin-top:20px; padding-top:15px; border-top:1px solid #e2e8f0; font-size:12px; color:#64748b; text-align:left;">
+      <strong>💡 บัญชีทดสอบระบบ:</strong><br>
+      • จป. : <code>safety@company.com</code><br>
+      • ผู้ขออนุญาตทั่วไป : <code>user@company.com</code>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== SIDEBAR MENU ==================== -->
+<aside class="sidebar">
+  <h2>SAFE PASS</h2>
+  <p class="sub-title">Smart Work Permit System</p>
+  <nav class="sidebar-menu">
+    <button type="button" class="menu-item active" id="menu-form" onclick="switchPage('form')">📝 ยื่นคำขอ Work Permit</button>
+    <button type="button" class="menu-item" id="menu-track" onclick="switchPage('track')">🔍 ติดตามสถานะ</button>
+    <button type="button" class="menu-item" id="menu-safety" onclick="switchPage('safety')">🛡️ พิจารณาอนุมัติ (จป.)</button>
+  </nav>
+</aside>
+
+<main class="main-content">
+
+  <!-- แถบแสดงชื่อผู้ล็อกอิน และปุ่มออกจากระบบ -->
+  <div class="user-bar">
+    <div>👤 ผู้ใช้งาน: <strong id="logged-user-email">user@company.com</strong> (<span id="logged-user-role">Safety</span>)</div>
+    <button class="btn btn-danger" style="padding:6px 12px; font-size:13px;" onclick="handleGlobalLogout()">ออกจากระบบ</button>
+  </div>
+
+  <!-- ==================== PAGE 1: FORM ==================== -->
+  <section id="page-form" class="card-container">
+    <h1 class="page-title">ยื่นคำขอใบอนุญาตทำงาน (Work Permit)</h1>
+    <div class="notice">
+      <strong>ข้อแนะนำ:</strong> กรุณากรอกข้อมูลและอัปโหลดหลักฐานความปลอดภัยให้ครบถ้วนก่อนยื่นคำขอ
+    </div>
+    
+    <form id="workPermitForm" onsubmit="submitWorkPermit(event)">
+      <div class="form-group">
+        <label>เลขที่ใบอนุญาตทำงาน (Work Permit No.) <span class="req">*</span></label>
+        <input type="text" id="wp_no" name="wp_no" readonly value="WP-2026-001" required>
+      </div>
+
+      <div class="section-title">1. ข้อมูลผู้ขออนุญาต</div>
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label>1.1 ชื่อบริษัท / สังกัด <span class="req">*</span></label>
+          <input type="text" name="company" required placeholder="กรอกชื่อบริษัท">
+        </div>
+        <div class="form-group">
+          <label>1.2 ชื่อ-นามสกุล ผู้ขออนุญาต <span class="req">*</span></label>
+          <input type="text" name="applicant_name" required placeholder="ชื่อ-นามสกุล">
+        </div>
+        <div class="form-group">
+          <label>1.3 รหัสพนักงาน/ผู้รับเหมา <span class="req">*</span></label>
+          <input type="text" name="employee_id" required placeholder="กรอกรหัส">
+        </div>
+        <div class="form-group">
+          <label>1.4 อีเมลติดต่อ <span class="req">*</span></label>
+          <input type="email" id="applicant_email_input" name="applicant_email" required placeholder="name@company.com">
+        </div>
+        <div class="form-group">
+          <label>1.5 แผนก <span class="req">*</span></label>
+          <select name="department" required>
+            <option value="">-- เลือกแผนก --</option>
+            <option value="Production">Production</option>
+            <option value="Maintenance">Maintenance</option>
+            <option value="Warehouse">Warehouse</option>
+            <option value="Engineering">Engineering</option>
+            <option value="QC">QC</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="section-title">2. ประเภทงานและมาตรการตรวจเฉพาะ (High-Risk Work)</div>
+      <div class="form-grid">
+        <div class="form-group full-width">
+          <label>2.1 เลือกประเภทงานเสี่ยงสูง <span class="req">*</span></label>
+          <select id="work_type" name="work_type" required onchange="handleWorkTypeChange()">
+            <option value="">-- กรุณาเลือกประเภทงาน --</option>
+            <option value="Work at Height">1. งานบนที่สูง (Work at Height)</option>
+            <option value="Confined Space">2. งานที่อับอากาศ (Confined Space Work)</option>
+            <option value="Hot Work">3. งานเกี่ยวกับความร้อนและการเชื่อม (Hot Work and Welding)</option>
+            <option value="Chemical">4. งานเกี่ยวกับสารเคมีและวัตถุอันตราย (Chemical and Hazardous Materials Work)</option>
+            <option value="Electrical">5. งานเกี่ยวกับระบบไฟฟ้าแรงสูงและระบบพลังงาน (High-Voltage Electrical and Energy Systems Work)</option>
+            <option value="Construction">6. งานก่อสร้างและรื้อถอน (Construction and Demolition Work)</option>
+            <option value="Maintenance">7. งานซ่อมแซม บำรุงรักษา และติดตั้ง (Repair, Maintenance and Installation Work)</option>
+            <option value="Engineering Inspection">8. งานตรวจสอบและทดสอบทางวิศวกรรม (Engineering Inspection and Testing)</option>
+            <option value="Cleaning">9. งานทำความสะอาดและฟื้นฟูสภาพ (Cleaning and Restoration Work)</option>
+          </select>
+        </div>
+
+        <!-- 1. งานบนที่สูง -->
+        <div id="checklist-height" class="form-group full-width hidden checklist-box">
+          <label>🧗 รายการอุปกรณ์ป้องกันส่วนบุคคล (PPE): งานบนที่สูง</label>
+          <div class="options-group">
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หมวกนิรภัย พร้อมสายรัดคาง"> 1. หมวกนิรภัย (Safety Helmet) พร้อมสายรัดคาง</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="เข็มขัดนิรภัยแบบเต็มตัว"> 2. เข็มขัดนิรภัยแบบเต็มตัว (Full Body Harness)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="สายช่วยชีวิต"> 3. สายช่วยชีวิต (Lanyard)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="อุปกรณ์ดูดซับแรงกระชาก"> 4. อุปกรณ์ดูดซับแรงกระชาก (Shock Absorber)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="อุปกรณ์เชื่อมต่อกับจุดยึด"> 5. อุปกรณ์เชื่อมต่อกับจุดยึด (Connector)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="อุปกรณ์ป้องกันการตกจากที่สูง"> 6. อุปกรณ์ป้องกันการตกจากที่สูง (Fall Arrest System)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="รองเท้านิรภัยกันลื่น"> 7. รองเท้านิรภัยกันลื่น (Safety Shoes)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือนิรภัย"> 8. ถุงมือนิรภัย (Safety Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="แว่นตานิรภัย"> 9. แว่นตานิรภัย (Safety Glasses)</label>
+          </div>
+        </div>
+
+        <!-- 2. งานที่อับอากาศ -->
+        <div id="checklist-confined" class="form-group full-width hidden checklist-box">
+          <label>🚪 รายการอุปกรณ์ป้องกันส่วนบุคคล (PPE): งานที่อับอากาศ</label>
+          <div class="options-group">
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หมวกนิรภัย"> 1. หมวกนิรภัย (Safety Helmet)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="เครื่องตรวจวัดก๊าซ"> 2. เครื่องตรวจวัดก๊าซ (Gas Detector)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="เครื่องช่วยหายใจ"> 3. เครื่องช่วยหายใจ (Respiratory Protection Equipment)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ชุดป้องกันสารเคมี"> 4. ชุดป้องกันสารเคมี (Chemical Protective Suit)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือป้องกันสารเคมี"> 5. ถุงมือป้องกันสารเคมี (Chemical-Resistant Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="แว่นตานิรภัย"> 6. แว่นตานิรภัย (Safety Glasses)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="รองเท้านิรภัย"> 7. รองเท้านิรภัย (Safety Shoes)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="เข็มขัดนิรภัยแบบเต็มตัว"> 8. เข็มขัดนิรภัยแบบเต็มตัว (Full Body Harness)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ขาตั้งสามขาพร้อมรอกกู้ภัย"> 9. อุปกรณ์ช่วยเหลือผู้ประสบภัย เช่น ขาตั้งสามขาพร้อมรอกกู้ภัย (Tripod and Rescue Winch)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="อุปกรณ์สื่อสารที่เหมาะสม"> 10. อุปกรณ์สื่อสารที่เหมาะสมกับสภาพพื้นที่ (Communication Equipment)</label>
+          </div>
+        </div>
+
+        <!-- 3. งานเกี่ยวกับความร้อนและการเชื่อม -->
+        <div id="checklist-hotwork" class="form-group full-width hidden checklist-box">
+          <label>🔥 รายการอุปกรณ์ป้องกันส่วนบุคคล (PPE): งานเกี่ยวกับความร้อนและการเชื่อม</label>
+          <div class="options-group">
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หน้ากากเชื่อม"> 1. หน้ากากเชื่อม (Welding Helmet)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="แว่นตานิรภัย"> 2. แว่นตานิรภัย (Safety Glasses)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="กระบังหน้าป้องกันสะเก็ดไฟ"> 3. กระบังหน้าป้องกันสะเก็ดไฟ (Face Shield)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือหนังสำหรับงานเชื่อม"> 4. ถุงมือหนังสำหรับงานเชื่อม (Welding Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ชุดป้องกันความร้อนและสะเก็ดไฟ"> 5. เสื้อหรือชุดป้องกันความร้อนและสะเก็ดไฟ (Heat-Resistant Protective Clothing)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ปลอกแขนหนังป้องกันสะเก็ดไฟ"> 6. ปลอกแขนหนังป้องกันสะเก็ดไฟ (Leather Sleeves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="รองเท้านิรภัยหุ้มข้อ"> 7. รองเท้านิรภัยหุ้มข้อ (Safety Boots)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="อุปกรณ์ป้องกันระบบทางเดินหายใจ"> 8. อุปกรณ์ป้องกันระบบทางเดินหายใจที่เหมาะสมกับควันเชื่อม (Respiratory Protection)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ที่อุดหูหรือครอบหูลดเสียง"> 9. ที่อุดหูหรือครอบหูลดเสียง (Earplugs or Earmuffs)</label>
+          </div>
+        </div>
+
+        <!-- 4. งานเกี่ยวกับสารเคมีและวัตถุอันตราย -->
+        <div id="checklist-chemical" class="form-group full-width hidden checklist-box">
+          <label>🧪 รายการอุปกรณ์ป้องกันส่วนบุคคล (PPE): งานเกี่ยวกับสารเคมีและวัตถุอันตราย</label>
+          <div class="options-group">
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หมวกนิรภัย"> 1. หมวกนิรภัย (Safety Helmet)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="แว่นครอบตาป้องกันสารเคมี"> 2. แว่นครอบตาป้องกันสารเคมี (Chemical Splash Goggles)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="กระบังหน้าป้องกันสารเคมี"> 3. กระบังหน้าป้องกันสารเคมี (Chemical Face Shield)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือป้องกันสารเคมี"> 4. ถุงมือป้องกันสารเคมี (Chemical-Resistant Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ชุดป้องกันสารเคมี"> 5. ชุดป้องกันสารเคมี (Chemical Protective Suit)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="รองเท้าบูตป้องกันสารเคมี"> 6. รองเท้าบูตป้องกันสารเคมี (Chemical-Resistant Boots)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หน้ากากกรองสารเคมี"> 7. หน้ากากกรองสารเคมี (Chemical Respirator)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หน้ากากกรองอนุภาค"> 8. หน้ากากกรองอนุภาค (Particulate Respirator) สำหรับฝุ่นที่เหมาะสม</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ผ้ากันเปื้อนป้องกันสารเคมี"> 9. ผ้ากันเปื้อนป้องกันสารเคมี (Chemical-Resistant Apron)</label>
+          </div>
+        </div>
+
+        <!-- 5. งานเกี่ยวกับระบบไฟฟ้าแรงสูงและระบบพลังงาน -->
+        <div id="checklist-electrical" class="form-group full-width hidden checklist-box">
+          <label>⚡ รายการอุปกรณ์ป้องกันส่วนบุคคล (PPE): งานเกี่ยวกับระบบไฟฟ้าแรงสูงและระบบพลังงาน</label>
+          <div class="options-group">
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หมวกนิรภัยเหมาะกับงานไฟฟ้า"> 1. หมวกนิรภัยที่เหมาะกับงานไฟฟ้า (Electrical Safety Helmet)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือฉนวนไฟฟ้า"> 2. ถุงมือฉนวนไฟฟ้า (Insulating Rubber Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือหนังสวมทับถุงมือฉนวน"> 3. ถุงมือหนังสวมทับถุงมือฉนวน (Leather Protector Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="รองเท้านิรภัยงานไฟฟ้า"> 4. รองเท้านิรภัยที่มีคุณสมบัติเหมาะสมกับงานไฟฟ้า (Electrical Safety Footwear)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="เสื้อผ้าป้องกันอาร์กแฟลช"> 5. เสื้อผ้าป้องกันอาร์กแฟลช (Arc-Rated Clothing)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="กระบังหน้าป้องกันอาร์กแฟลช"> 6. กระบังหน้าป้องกันอาร์กแฟลช (Arc-Rated Face Shield)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="แว่นตานิรภัย"> 7. แว่นตานิรภัย (Safety Glasses)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="อุปกรณ์ป้องกันการได้ยิน"> 8. อุปกรณ์ป้องกันการได้ยิน (Hearing Protection)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ชุดป้องกันไฟฟ้าสถิต"> 9. ชุดป้องกันไฟฟ้าสถิต สำหรับงานที่มีความเสี่ยงจากไฟฟ้าสถิตโดยเฉพาะ</label>
+          </div>
+        </div>
+
+        <!-- 6. งานก่อสร้างและรื้อถอน -->
+        <div id="checklist-construction" class="form-group full-width hidden checklist-box">
+          <label>🏗️ รายการอุปกรณ์ป้องกันส่วนบุคคล (PPE): งานก่อสร้างและรื้อถอน</label>
+          <div class="options-group">
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หมวกนิรภัย"> 1. หมวกนิรภัย (Safety Helmet)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="แว่นตานิรภัย"> 2. แว่นตานิรภัย (Safety Glasses)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="กระบังหน้าป้องกันเศษวัสดุ"> 3. กระบังหน้าป้องกันเศษวัสดุ (Face Shield)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หน้ากากกรองฝุ่น"> 4. หน้ากากกรองฝุ่น (Dust Respirator)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือนิรภัย"> 5. ถุงมือนิรภัย (Safety Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="รองเท้านิรภัยหัวเหล็ก"> 6. รองเท้านิรภัยหัวเหล็กหรือวัสดุป้องกันแรงกระแทกที่เหมาะสม (Safety Shoes)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="เสื้อสะท้อนแสง"> 7. เสื้อสะท้อนแสง (High-Visibility Vest)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ที่อุดหูหรือครอบหูลดเสียง"> 8. ที่อุดหูหรือครอบหูลดเสียง (Hearing Protection)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ชุดป้องกันการตกจากที่สูง"> 9. ชุดป้องกันการตกจากที่สูง (Fall Protection Equipment)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="อุปกรณ์ป้องกันเข่า"> 10. อุปกรณ์ป้องกันเข่า (Knee Pads) สำหรับงานที่ต้องคุกเข่า</label>
+          </div>
+        </div>
+
+        <!-- 7. งานซ่อมแซม บำรุงรักษา และติดตั้ง -->
+        <div id="checklist-maintenance" class="form-group full-width hidden checklist-box">
+          <label>🔧 รายการอุปกรณ์ป้องกันส่วนบุคคล (PPE): งานซ่อมแซม บำรุงรักษา และติดตั้ง</label>
+          <div class="options-group">
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หมวกนิรภัย"> 1. หมวกนิรภัย (Safety Helmet)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="แว่นตานิรภัย"> 2. แว่นตานิรภัย (Safety Glasses)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือนิรภัย"> 3. ถุงมือนิรภัย (Safety Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="รองเท้านิรภัย"> 4. รองเท้านิรภัย (Safety Shoes)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="เสื้อสะท้อนแสง"> 5. เสื้อสะท้อนแสง (High-Visibility Vest)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ที่อุดหูหรือครอบหูลดเสียง"> 6. ที่อุดหูหรือครอบหูลดเสียง (Hearing Protection)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หน้ากากกรองฝุ่นหรือสารเคมี"> 7. หน้ากากกรองฝุ่นหรือสารเคมีตามลักษณะงาน (Respiratory Protection)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="กระบังหน้าป้องกันสะเก็ดวัสดุ"> 8. กระบังหน้าป้องกันสะเก็ดวัสดุ (Face Shield)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ชุดป้องกันการตกจากที่สูง"> 9. ชุดป้องกันการตกจากที่สูง (Fall Protection Equipment)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ชุดป้องกันสารเคมี"> 10. ชุดป้องกันสารเคมี (Chemical Protective Clothing) กรณีสัมผัสสารเคมี</label>
+          </div>
+        </div>
+
+        <!-- 8. งานตรวจสอบและทดสอบทางวิศวกรรม -->
+        <div id="checklist-inspection" class="form-group full-width hidden checklist-box">
+          <label>📋 รายการอุปกรณ์ป้องกันส่วนบุคคล (PPE): งานตรวจสอบและทดสอบทางวิศวกรรม</label>
+          <div class="options-group">
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หมวกนิรภัย"> 1. หมวกนิรภัย (Safety Helmet)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="แว่นตานิรภัย"> 2. แว่นตานิรภัย (Safety Glasses)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือนิรภัย"> 3. ถุงมือนิรภัย (Safety Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="รองเท้านิรภัย"> 4. รองเท้านิรภัย (Safety Shoes)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="เสื้อสะท้อนแสง"> 5. เสื้อสะท้อนแสง (High-Visibility Vest)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="อุปกรณ์ป้องกันการได้ยิน"> 6. อุปกรณ์ป้องกันการได้ยิน (Hearing Protection)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หน้ากากกรองฝุ่นหรือสารเคมี"> 7. หน้ากากกรองฝุ่นหรือสารเคมีตามความเสี่ยง (Respiratory Protection)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ชุดป้องกันการตกจากที่สูง"> 8. ชุดป้องกันการตกจากที่สูง (Fall Protection Equipment)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="กระบังหน้าป้องกันสะเก็ดวัสดุ"> 9. กระบังหน้าป้องกันสะเก็ดวัสดุ (Face Shield)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือฉนวนไฟฟ้า"> 10. ถุงมือฉนวนไฟฟ้า สำหรับการทดสอบระบบไฟฟ้าที่มีความเสี่ยงตามที่ประเมินไว้</label>
+          </div>
+        </div>
+
+        <!-- 9. งานทำความสะอาดและฟื้นฟูสภาพ -->
+        <div id="checklist-cleaning" class="form-group full-width hidden checklist-box">
+          <label>🧹 รายการอุปกรณ์ป้องกันส่วนบุคคล (PPE): งานทำความสะอาดและฟื้นฟูสภาพ</label>
+          <div class="options-group">
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หมวกนิรภัย"> 1. หมวกนิรภัย (Safety Helmet) กรณีมีความเสี่ยงจากวัสดตกหล่น</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="แว่นครอบตาป้องกันสารเคมี"> 2. แว่นครอบตาป้องกันสารเคมี (Chemical Splash Goggles)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="กระบังหน้าป้องกันสารเคมี"> 3. กระบังหน้าป้องกันสารเคมี (Chemical Face Shield)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ถุงมือป้องกันสารเคมี"> 4. ถุงมือป้องกันสารเคมี (Chemical-Resistant Gloves)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="รองเท้าบูตกันน้ำหรือทนสารเคมี"> 5. รองเท้าบูตกันน้ำหรือทนสารเคมี (Waterproof or Chemical-Resistant Boots)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ชุดป้องกันสารเคมีหรือชุดกันน้ำ"> 6. ชุดป้องกันสารเคมีหรือชุดกันน้ำ (Protective Suit)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="หน้ากากกรองฝุ่นหรือสารเคมี"> 7. หน้ากากกรองฝุ่นหรือสารเคมี (Respiratory Protection)</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="เสื้อสะท้อนแสง"> 8. เสื้อสะท้อนแสง (High-Visibility Vest) กรณีทำงานใกล้ยานพาหนะ</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="ที่อุดหูหรือครอบหูลดเสียง"> 9. ที่อุดหูหรือครอบหูลดเสียง (Hearing Protection) กรณีใช้เครื่องจักรเสียงดัง</label>
+            <label class="option-label"><input type="checkbox" name="specific_check" value="อุปกรณ์ป้องกันการตกจากที่สูง"> 10. อุปกรณ์ป้องกันการตกจากที่สูง กรณีทำความสะอาดพื้นที่สูง</label>
+          </div>
+        </div>
+
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-submit">ยื่นคำขออนุญาต</button>
+    </form>
+  </section>
+
+  <!-- ==================== PAGE 2: TRACKING ==================== -->
+  <section id="page-track" class="card-container hidden">
+    <h1 class="page-title">ติดตามสถานะใบอนุญาตทำงาน</h1>
+    <div id="track-list">
+      <p style="text-align:center; color:#64748b;">กำลังโหลดข้อมูล...</p>
+    </div>
+  </section>
+
+  <!-- ==================== PAGE 3: SAFETY APPROVAL ==================== -->
+  <section id="page-safety" class="card-container hidden">
+    <h1 class="page-title">รายการรออนุมัติ (สำหรับ จป. / เจ้าหน้าที่ความปลอดภัย)</h1>
+    <div id="safety-list">
+      <p style="text-align:center; color:#64748b;">กำลังโหลดข้อมูล...</p>
+    </div>
+  </section>
+
+</main>
+
+<script>
+// JavaScript ควบคุมการเปลี่ยนหน้าและการเปิด/ปิด รายการตรวจอุปกรณ์ตามประเภทงานที่เลือก
+function handleWorkTypeChange() {
+  const type = document.getElementById('work_type').value;
+  
+  // ซ่อน checklist ทั้งหมดก่อน
+  const checklists = [
+    'checklist-height', 
+    'checklist-confined', 
+    'checklist-hotwork', 
+    'checklist-chemical', 
+    'checklist-electrical', 
+    'checklist-construction', 
+    'checklist-maintenance', 
+    'checklist-inspection', 
+    'checklist-cleaning'
+  ];
+  
+  checklists.forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.add('hidden');
+  });
+
+  // แสดงเฉพาะ checklist ของประเภทงานที่เลือก
+  if(type === 'Work at Height') document.getElementById('checklist-height')?.classList.remove('hidden');
+  else if(type === 'Confined Space') document.getElementById('checklist-confined')?.classList.remove('hidden');
+  else if(type === 'Hot Work') document.getElementById('checklist-hotwork')?.classList.remove('hidden');
+  else if(type === 'Chemical') document.getElementById('checklist-chemical')?.classList.remove('hidden');
+  else if(type === 'Electrical') document.getElementById('checklist-electrical')?.classList.remove('hidden');
+  else if(type === 'Construction') document.getElementById('checklist-construction')?.classList.remove('hidden');
+  else if(type === 'Maintenance') document.getElementById('checklist-maintenance')?.classList.remove('hidden');
+  else if(type === 'Engineering Inspection') document.getElementById('checklist-inspection')?.classList.remove('hidden');
+  else if(type === 'Cleaning') document.getElementById('checklist-cleaning')?.classList.remove('hidden');
+}
+
+function switchPage(page) {
+  document.querySelectorAll('main > section').forEach(s => s.classList.add('hidden'));
+  document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('active'));
+  
+  document.getElementById('page-' + page).classList.remove('hidden');
+  document.getElementById('menu-' + page).classList.add('active');
+}
+
+function handleGlobalLogin(e) {
+  e.preventDefault();
+  const email = document.getElementById('app_email').value;
+  document.getElementById('logged-user-email').innerText = email;
+  document.getElementById('logged-user-role').innerText = email.includes('safety') ? 'Safety' : 'User';
+  document.getElementById('app-login-screen').style.display = 'none';
+}
+
+function handleGlobalLogout() {
+  document.getElementById('app-login-screen').style.display = 'flex';
+}
+
+function submitWorkPermit(e) {
+  e.preventDefault();
+  alert('บันทึกข้อมูลยื่นคำขอเรียบร้อยแล้ว');
+}
+</script>
+
+</body>
+</html>
